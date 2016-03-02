@@ -18,17 +18,17 @@
 
 void procRequest(int Socket)
 {
-    /*
+    
     std::cout << std::cout << "thread = 0x" << std::hex << std::this_thread::get_id()
               << std::dec << " socket = " << Socket << std::endl;
-    */
+    
 
     /*
     std::ofstream file("server.log");
     file << std::cout << "thread = 0x" << std::hex << std::this_thread::get_id()
          << std::dec << " socket = " << Socket << std::endl;
     */
-    //printf("thread = %h | socket = %d", std::this_thread::get_id(), Socket);
+    
 
 
     // recieve data
@@ -107,16 +107,7 @@ void procRequest(int Socket)
 
 int main(int argc, char *argv[])
 {
-    //std::cout << "main thread: 0x" << std::hex << std::this_thread::get_id() << std::endl;
-
-    // если запускаем без аргументов, выводим справку
-    if(argc == 1) {
-        printf("usage:\n");
-        printf(" ./wserver -h <ip> -p <port> -d <directory>\n");
-        printf("example:\n");
-        printf(" $ ./wserver -h '127.0.0.1' -p 12345 -d '/tmp/test/'\n");
-        return 0;
-    }
+    std::cout << "main thread: 0x" << std::hex << std::this_thread::get_id() << std::endl;
 
     char* opts = "h:p:d:";          // доступные опции, каждая принимает аргумент
     int port;                       // number of port
@@ -138,7 +129,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (0) {                        // print parameters
+    if (1) {                        // print parameters
         printf("parametrs:\n");
         printf("\t host = %s\n", host);
         printf("\t port = %d\n", port);
@@ -150,7 +141,7 @@ int main(int argc, char *argv[])
     //printf("Parant PID = %d\n", par_pid);
 
     pid_t ch_pid = fork();
-    if( !ch_pid )                   // child process
+    if( 1 /* !ch_pid */)                   // child process
     {
         //printf("Child PID = %i (child process).\n", getpid());
 
@@ -160,7 +151,7 @@ int main(int argc, char *argv[])
         int MasterSocket = socket(AF_INET,              // IPv4
                                  SOCK_STREAM,           // TCP
                                  IPPROTO_TCP);
-        //std::cout << "master socket = " << MasterSocket << std::endl;
+        std::cout << "master socket = " << MasterSocket << std::endl;
 
         struct in_addr addr;
         inet_aton( host, &addr);
@@ -170,28 +161,26 @@ int main(int argc, char *argv[])
         SockAddr.sin_addr   = addr;
         //SockAddr.sin_addr.s_addr = htons( INADDR_ANY );
 
-        //close( MasterSocket );
-        //return 0;
 
         int st_bind = bind(MasterSocket, (struct sockaddr *)(&SockAddr), sizeof(SockAddr));
-        //std::cout << "[error | bind] " << strerror( errno ) << std::endl;
+        std::cout << "[error | bind] " << strerror( errno ) << std::endl;
         int st_listen = listen(MasterSocket, SOMAXCONN);
-        //std::cout << "state bind: " << st_bind << std::endl;
-        //std::cout << "state listen: " << st_listen << std::endl;
+        std::cout << "state bind: " << st_bind << std::endl;
+        std::cout << "state listen: " << st_listen << std::endl;
 
         // loop connects
         while(1){
-            //std::cout << "wait connection ..." << std::endl;
+            std::cout << "wait connection ..." << std::endl;
 
             int Socket = accept(MasterSocket, 0, 0);
-            //std::cout << "socket = " << Socket << std::endl;
+            std::cout << "socket = " << Socket << std::endl;
 
             // run thread of request proccesing
             std::thread thrProccesReq(procRequest, Socket);
             thrProccesReq.detach();
 
-            //close( MasterSocket );
-            //return 0;
+            close( MasterSocket );
+            return 0;
 
         }
 
