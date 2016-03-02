@@ -2,13 +2,61 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include <iostream>
+#include <fstream>
+#include <thread>
+
+#include <errno.h>
+#include <string.h>
+
+
+void procRequest(int Socket)
+{
+    std::cout << std::cout << "thread = 0x" << std::hex << std::this_thread::get_id()
+              << std::dec << " socket = " << Socket << std::endl;
+    /*
+    std::ofstream file("server.log");
+    file << std::cout << "thread = 0x" << std::hex << std::this_thread::get_id()
+         << std::dec << " socket = " << Socket << std::endl;
+    */
+    printf("thread = %h | socket = %d", std::this_thread::get_id(), Socket);
+
+
+    // recieve data
+    // ===============================
+    int Buffer[5] = {0,0,0,0,0};
+    recv(Socket, Buffer, 4, MSG_NOSIGNAL);
+    printf("\tdata = %s\n", Buffer);
+
+    //make response
+    // ===============================
+
+
+
+    //send responce
+    // ===============================
+
+
+
+    // close connection
+    // ===============================
+    shutdown( Socket, SHUT_RDWR);
+    close( Socket );
+
+    //file.close();
+
+}
 
 
 
 int main(int argc, char *argv[])
 {
-    std::cout << "run application ...\n";
+    std::cout << "main thread: 0x" << std::hex << std::this_thread::get_id() << std::endl;
 
     // если запускаем без аргументов, выводим справку
     if(argc == 1) {
@@ -19,10 +67,10 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    char *opts = "h:p:d:";          // доступные опции, каждая принимает аргумент
-    int port;                       // тут храним числа
-    char* host;                     // а тут оператор
-    char* dir;                      // директория
+    char* opts = "h:p:d:";          // доступные опции, каждая принимает аргумент
+    int port;                       // number of port
+    char* host;                     // host name
+    char* dir;                      // directory
 
     int opt;                        // каждая следующая опция попадает сюда
     while((opt = getopt(argc, argv, opts)) != -1) { // вызываем getopt пока она не вернет -1
@@ -39,7 +87,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (1) {                    // print parameters
+    if (1) {                        // print parameters
         printf("parametrs:\n");
         printf("\t host = %s\n", host);
         printf("\t port = %d\n", port);
@@ -50,15 +98,56 @@ int main(int argc, char *argv[])
     pid_t par_pid = getpid();
     printf("Parant PID = %d\n", par_pid);
 
-    pid_t ch_pid = fork();
-    if( !ch_pid )
+    //pid_t ch_pid = fork();
+    if( 1 /*!ch_pid*/ )                   // child process
     {
         printf("Child PID = %i (child process).\n", getpid());
 
+        //chdir( dir );
+
+        // open socket
+        int MasterSocket = socket(AF_INET,              // IPv4
+                                 SOCK_STREAM,           // TCP
+                                 IPPROTO_TCP);
+        std::cout << "master socket = " << MasterSocket << std::endl;
+
+        //struct in_addr addr;
+        //inet_aton( host, &addr);
+        struct sockaddr_in SockAddr;
+        SockAddr.sin_family = AF_INET;
+        SockAddr.sin_port   = htons( port );
+        //SockAddr.sin_addr   = addr;
+        SockAddr.sin_addr.s_addr = htons( INADDR_ANY );
+        //close( MasterSocket );
+        //return 0;
+
+        int st_bind = bind(MasterSocket, (struct sockaddr *)(&SockAddr), sizeof(SockAddr));
+        std::cout << "[error | bind] " << strerror( errno ) << std::endl;
+        int st_listen = listen(MasterSocket, SOMAXCONN);
+        std::cout << "state bind: " << st_bind << std::endl;
+        std::cout << "state listen: " << st_listen << std::endl;
+
+        // loop connects
+        while(1){
+            std::cout << "wait connection ..." << std::endl;
+
+            int Socket = accept(MasterSocket, 0, 0);
+            std::cout << "socket = " << Socket << std::endl;
+
+            // run thread of request proccesing
+            std::thread thrProccesReq(procRequest, Socket);
+            thrProccesReq.detach();
+
+        }
+
+        // close socket
+        close( MasterSocket );
 
 
+        printf("Process (PID = %d) finished.\n", getpid());
     }
 
 
+    printf("Process (PID = %d) finished.\n", getpid());
     return 0;
 }
