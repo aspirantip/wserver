@@ -16,12 +16,14 @@
 #include <vector>
 
 
-void procRequest(int Socket)
+//std::string pathServer;
+
+void procRequest(int Socket, std::string pathServer)
 {
-    
-    std::cout << std::cout << "thread = 0x" << std::hex << std::this_thread::get_id()
+    /*
+    std::cout << std::endl << "thread = 0x" << std::hex << std::this_thread::get_id()
               << std::dec << " socket = " << Socket << std::endl;
-    
+    */
 
     /*
     std::ofstream file("server.log");
@@ -33,9 +35,6 @@ void procRequest(int Socket)
 
     // recieve data
     // ===============================
-    //int Buffer[5] = {0,0,0,0,0};
-    //recv(Socket, Buffer, 4, MSG_NOSIGNAL);
-    //printf("\tdata = %s\n", Buffer);
     const unsigned  int size_data = 1024 * 10;
     char buffer[size_data];
     int n = recv(Socket, buffer, size_data, 0);
@@ -47,6 +46,8 @@ void procRequest(int Socket)
     // parse request
     // ===============================
     std::string strBuff(buffer);
+    //std::cout << "request: " << strBuff << std::endl;
+
     std::string result;
     if(strBuff.find("GET") == 0){
         result = strBuff.substr(3, strBuff.find("HTTP") - 3);
@@ -62,6 +63,11 @@ void procRequest(int Socket)
                      *it = '\0';
         }
     }
+
+
+
+    result = pathServer + result;
+   // std::cout << "request: " << result << std::endl;
 
 
     //send response
@@ -86,10 +92,11 @@ void procRequest(int Socket)
 
     }
     else{
-        char resp[] = "HTTP/1.0 404 NOT FOUND\x0D\x0A"
-                      "Content-Length: 0\x0D\x0A"
-                      "Content-Type: text/html\x0D\x0A\x0D\x0A";
-        write(Socket, resp, sizeof(resp));
+        char resp[] =  "HTTP/1.0 404 NOT FOUND\x0D\x0A"
+                            "Content-Length: 0\x0D\x0A"
+                            "Content-Type: text/html\x0D\x0A\x0D\x0A";
+        size_t sz_resp = write(Socket, resp, sizeof(resp));
+//        std::cout << "send data: " << sz_resp << std::endl;
     }
 
 
@@ -107,7 +114,7 @@ void procRequest(int Socket)
 
 int main(int argc, char *argv[])
 {
-    std::cout << "main thread: 0x" << std::hex << std::this_thread::get_id() << std::endl;
+    //std::cout << "main thread: 0x" << std::hex << std::this_thread::get_id() << std::endl;
 
     char* opts = "h:p:d:";          // доступные опции, каждая принимает аргумент
     int port;                       // number of port
@@ -129,29 +136,39 @@ int main(int argc, char *argv[])
         }
     }
 
+    /*
     if (1) {                        // print parameters
         printf("parametrs:\n");
         printf("\t host = %s\n", host);
         printf("\t port = %d\n", port);
         printf("\t dir  = %s\n", dir);
     }
-
+    */
 
     pid_t par_pid = getpid();
     //printf("Parant PID = %d\n", par_pid);
 
     pid_t ch_pid = fork();
-    if( 1 /* !ch_pid */)                   // child process
+    if( !ch_pid )                   // child process
     {
         //printf("Child PID = %i (child process).\n", getpid());
 
-        chdir( dir );
+        std::string pathServer = dir;
+        //std::cout << "path to server: " << pathServer << std::endl;
+        int state = chdir (dir);
+        //std::cout << "state directory changing:" << state << std::endl;
+        if( !state ){
+          //  std::cout << "directory changed" << std::endl;
+        }
+        else
+            return 0;
+
 
         // open socket
         int MasterSocket = socket(AF_INET,              // IPv4
                                  SOCK_STREAM,           // TCP
                                  IPPROTO_TCP);
-        std::cout << "master socket = " << MasterSocket << std::endl;
+        //std::cout << "master socket = " << MasterSocket << std::endl;
 
         struct in_addr addr;
         inet_aton( host, &addr);
@@ -162,28 +179,33 @@ int main(int argc, char *argv[])
         //SockAddr.sin_addr.s_addr = htons( INADDR_ANY );
 
 
+        SO_REUSEADDR;
+
         int st_bind = bind(MasterSocket, (struct sockaddr *)(&SockAddr), sizeof(SockAddr));
-        std::cout << "[error | bind] " << strerror( errno ) << std::endl;
+        //std::cout << "[error | bind] " << strerror( errno ) << std::endl;
         int st_listen = listen(MasterSocket, SOMAXCONN);
-        std::cout << "state bind: " << st_bind << std::endl;
-        std::cout << "state listen: " << st_listen << std::endl;
+        //std::cout << "state bind: " << st_bind << std::endl;
+        //std::cout << "state listen: " << st_listen << std::endl;
 
         // loop connects
         while(1){
-            std::cout << "wait connection ..." << std::endl;
+            //std::cout << "wait connection ..." << std::endl;
 
             int Socket = accept(MasterSocket, 0, 0);
-            std::cout << "socket = " << Socket << std::endl;
+            //std::cout << "socket = " << Socket << std::endl;
 
             // run thread of request proccesing
-            std::thread thrProccesReq(procRequest, Socket);
+            std::thread thrProccesReq(procRequest, Socket, pathServer);
+            //thrProccesReq.join();
             thrProccesReq.detach();
 
-            close( MasterSocket );
-            return 0;
+            //sleep(15);
+            //close( MasterSocket );
+            //return 0;
 
         }
 
+        sleep(15);
         // close socket
         close( MasterSocket );
 
@@ -192,6 +214,6 @@ int main(int argc, char *argv[])
     }
 
 
-    //printf("Process (PID = %d) finished.\n", getpid());
+    printf("Process (PID = %d) finished.\n", getpid());
     return 0;
 }
